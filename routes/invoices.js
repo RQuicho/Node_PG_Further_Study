@@ -63,9 +63,27 @@ router.post('/', async (req, res, next) => {
 
 router.put('/:id', async (req, res, next) => {
     try {
-        const {amt} = req.body; 
+        const {amt, paid} = req.body; 
         const {id} = req.params;
-        const results = await db.query(`UPDATE invoices SET amt=$1 WHERE id=$2 RETURNING id, comp_code, amt, paid, add_date, paid_date`, [amt, id]);
+        let paidDate = null;
+
+        const currResults = await db.query(`SELECT paid FROM invoices WHERE id=$1`, [id]);
+
+        if (currResults.rows.length === 0) {
+            throw new ExpressError(`No invoice with id of ${id}`, 404);
+        }
+
+        let currPaidDate = currResults.rows[0].paid_date;
+
+        if (paid && !currPaidDate) {
+            paidDate = new Date();
+        } else if (!paid) {
+            paidDate = null;
+        } else {
+            paidDate = currPaidDate;
+        }
+
+        const results = await db.query(`UPDATE invoices SET amt=$1, paid=$2, paid_date=$3 WHERE id=$4 RETURNING id, comp_code, amt, paid, add_date, paid_date`, [amt, paid, paidDate, id]);
         if (results.rows.length === 0) {
             throw new ExpressError(`Cannot update company with code of ${id}`, 404);
         }
